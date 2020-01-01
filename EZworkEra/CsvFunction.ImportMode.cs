@@ -6,7 +6,9 @@
         {
             All,
             NoChara,
-            Revert
+            Revert,
+            OnlyMyName,
+            OnlyMyVariable
         };
     }
 }
