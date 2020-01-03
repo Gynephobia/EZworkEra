@@ -58,6 +58,23 @@
     <Compile Include="Menu\Result\Result.MainMenu.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Ude\CharsetDetector.cs" />
+    <Compile Include="Ude\Core\BitPackage.cs" />
+    <Compile Include="Ude\Core\CharDistributionAnalyser.cs" />
+    <Compile Include="Ude\Core\CharsetProber.cs" />
+    <Compile Include="Ude\Core\CodingStateMachine.cs" />
+    <Compile Include="Ude\Core\EscCharsetProber.cs" />
+    <Compile Include="Ude\Core\EscSM.cs" />
+    <Compile Include="Ude\Core\EUCJPProber.cs" />
+    <Compile Include="Ude\Core\EUCKRProber.cs" />
+    <Compile Include="Ude\Core\JapaneseContextAnalyser.cs" />
+    <Compile Include="Ude\Core\MBCSGroupProber.cs" />
+    <Compile Include="Ude\Core\MBCSSM.cs" />
+    <Compile Include="Ude\Core\SJISProber.cs" />
+    <Compile Include="Ude\Core\SMModel.cs" />
+    <Compile Include="Ude\Core\UniversalDetector.cs" />
+    <Compile Include="Ude\Core\UTF8Prober.cs" />
+    <Compile Include="Ude\ICharsetDetector.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

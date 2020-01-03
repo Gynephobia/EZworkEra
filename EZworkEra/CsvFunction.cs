@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Xml;
+using Ude;
 
 namespace EZworkEra
 {
@@ -27,7 +28,7 @@ namespace EZworkEra
             return file.ToLower().Contains("variable") || file.ToLower().Contains("replace");
         }
 
-        public Dictionary<string, Dictionary<string, string>> ImportAllCsv(string path, SearchOption searchOption, Encoding encoding, ImportMode mode)
+        public Dictionary<string, Dictionary<string, string>> ImportAllCsv(string path, SearchOption searchOption, ImportMode mode)
         {
             List<string> files = GetPaths(path, searchOption);
 
@@ -67,7 +68,47 @@ namespace EZworkEra
             {
                 try
                 {
-                    result.Add(file, GetDictionary(file, encoding, mode));
+                    if (mode == ImportMode.VarDict)
+                    {
+                        Dictionary<string, string> dictionary = GetDictionary(file, ImportMode.VarDict);
+
+                        for (int i = 0; i < dictionary.Count; i++)
+                        {
+                            Dictionary<string, string> value = new Dictionary<string, string>();
+
+                            value.Add(dictionary[i.ToString()].Split(',')[0], dictionary[i.ToString()].Split(',')[1]);
+
+                            if (int.TryParse(dictionary[i.ToString()].Split(',')[1], out int n))
+                            {
+                                if (result.ContainsKey(dictionary[i.ToString()].Split(',')[2])) // 중복 시 dup#_ 추가
+                                {
+                                    int j = 1;
+
+                                    while (true)
+                                    {
+                                        if (!result.ContainsKey($"dup{j}_{dictionary[i.ToString()].Split(',')[2]}"))
+                                        {
+                                            result.Add($"dup{j}_{dictionary[i.ToString()].Split(',')[2]}", value);
+
+                                            break;
+                                        }
+
+                                        j++;
+                                    }
+                                }
+
+                                else
+                                {
+                                    result.Add(dictionary[i.ToString()].Split(',')[2], value);
+                                }
+                            }
+                        }
+                    }
+
+                    else
+                    {
+                        result.Add(file, GetDictionary(file, mode));
+                    }
                 }
 
                 catch (Exception e)
@@ -84,43 +125,128 @@ namespace EZworkEra
             return result;
         }
 
-        public Dictionary<string, string> GetDictionary(string path, Encoding encoding, ImportMode mode) // 이름을 뭘로 해야 될까
+        public Dictionary<string, string> GetDictionary(string path, ImportMode mode) // 이름을 뭘로 해야 될까
         {
             Dictionary<string, string> dictionary = new Dictionary<string, string>(); // 이름을 뭘로 해야 될까
 
-            foreach (string line in File.ReadAllLines(path, encoding))
-            {
-                if (line.Trim().Length > 0 && line.Trim().Substring(0, 1) != ";")
-                {
-                    if (mode == ImportMode.Revert)
-                    {
-                        dictionary.Add(line.Split(',')[1], line.Split(',')[0]);
-                    }
+            string encoding = string.Empty;
 
-                    else if (mode == ImportMode.OnlyMyName)
+            // Ude(https://github.com/errepi/ude)를 이용한 인코딩 자동 감지, 내용이 많을 수록 감지가 잘 되는 것 같음
+            using (FileStream fs = File.OpenRead(path))
+            {
+                ICharsetDetector cdet = new CharsetDetector();
+                cdet.Feed(fs);
+                cdet.DataEnd();
+
+                if (cdet.Charset != null)
+                {
+                    encoding = cdet.Charset;
+                }
+
+                // 인코딩 자동 감지 실패 시 수동 선택
+                else
+                {
+                    SelectEncoding();
+                }
+
+                fs.Position = 0;
+
+                using (StreamReader sr = new StreamReader(fs, Encoding.GetEncoding(encoding)))
+                {
+                    string[] lines = (string[])sr.ReadToEnd().Split(new string[] { Environment.NewLine }, StringSplitOptions.None).Clone();
+
+                    int i = 0;
+
+                    foreach (string line in lines)
                     {
-                        if(path.ToLower().Contains("chara"))
+                        if (line.Trim().Length > 0 && line.Trim().Substring(0, 1) != ";")
                         {
-                            if (line.Split(',')[0] == "CALLNAME" || line.Split(',')[0] == "呼び名")
+                            if (mode == ImportMode.Revert)
+                            {
+                                dictionary.Add(line.Split(',')[1], line.Split(',')[0]);
+                            }
+
+                            else if (mode == ImportMode.VarDict)
+                            {
+                                dictionary.Add(i.ToString(), path + "," + line);
+
+                                i++;
+                            }
+
+                            else if (mode == ImportMode.OnlyMyName)
+                            {
+                                if (path.ToLower().Contains("chara"))
+                                {
+                                    if (line.Split(',')[0] == "CALLNAME" || line.Split(',')[0] == "呼び名")
+                                    {
+                                        dictionary.Add(line.Split(',')[0], line.Split(',')[1]);
+                                    }
+                                }
+
+                                else
+                                {
+                                    dictionary.Add(line.Split(',')[0], line.Split(',')[1]);
+                                }
+                            }
+
+                            else
                             {
                                 dictionary.Add(line.Split(',')[0], line.Split(',')[1]);
                             }
                         }
-                        
-                        else
-                        {
-                            dictionary.Add(line.Split(',')[0], line.Split(',')[1]);
-                        }
-                    }
-
-                    else
-                    {
-                        dictionary.Add(line.Split(',')[0], line.Split(',')[1]);
                     }
                 }
             }
 
             return dictionary;
+
+            void SelectEncoding()
+            {
+                Console.WriteLine("====================================================================================================");
+                Console.WriteLine($"{path}의 인코딩을 감지할 수 없습니다.");
+                Console.WriteLine("                                         대상 파일의 인코딩을 선택하세요.");
+                Console.WriteLine("====================================================================================================");
+                Console.WriteLine("[0]. UTF-8");              // 구현
+                Console.WriteLine("[1]. UTF-8 with BOM");     // 구현, UTF-8과 동일, 나눠야 하는 의미가 없음
+                Console.WriteLine("[2]. SHIFT-JIS");          // 미구현, 932로 퉁치면 되는데 필요할까?, C#에선 932가 shift-jis로 나와서 뭔지 찾기도 힘들다
+                Console.WriteLine("[3]. 일본어 확장(cp932)"); // 구현
+                Console.WriteLine("[4]. EUC-KR");             // 구현, 949로 퉁치면 되는데 필요할까?
+                Console.WriteLine("[5]. 한국어 확장(cp949)"); // 구현
+                Console.WriteLine("====================================================================================================");
+                Console.Write("번호를 입력하세요. 클릭은 지원하지 않습니다. :");
+
+                string select = Console.ReadLine();
+
+
+
+                switch (select)
+                {
+                    case "0":
+                        encoding = "utf-8";
+                        break;
+
+                    case "1":
+                        encoding = "utf-8";
+                        break;
+
+                    case "3":
+                        encoding = "shift_jis";
+                        break;
+
+                    case "4":
+                        encoding = "euc-kr"; // 이거 맞겠지?
+                        break;
+
+                    case "5":
+                        encoding = "ks_c_5601-1987";
+                        break;
+
+                    default:
+                        Console.WriteLine("잘못된 입력입니다.");
+                        SelectEncoding();
+                        break;
+                }
+            }
         }
 
         public static void SaveDictionary(Dictionary<string, Dictionary<string, string>> dictionary, string fileName)
@@ -176,15 +302,24 @@ namespace EZworkEra
 
                 SelectSearchOption();
 
-                Encoding encoding;
+                Program.MainDictionary = new CsvFunction().ImportAllCsv(path, searchOption, mode);
 
-                SelectEncoding();
+                // 내용이 있을 때만 저장 여부를 물어봄
+                if (Program.MainDictionary.Count > 0)
+                {
+                    Console.WriteLine("추출이 완료되었습니다.");
+                    SelectSave();
+                }
 
-                Program.MainDictionary = new CsvFunction().ImportAllCsv(path, searchOption, encoding, mode);
+                //내용이 없을 경우
+                else
+                {
+                    Console.WriteLine("아무키나 누르시면 처음 메뉴로 돌아갑니다.");
 
-                Console.WriteLine("추출이 완료되었습니다.");
+                    Console.ReadKey();
 
-                SelectSave();
+                    Menu.MainMenu();
+                }
 
                 void SelectSearchOption()
                 {
@@ -211,51 +346,6 @@ namespace EZworkEra
                         default:
                             Console.WriteLine("잘못된 입력입니다.");
                             SelectSearchOption();
-                            break;
-                    }
-                }
-
-                void SelectEncoding()
-                {
-                    Console.WriteLine("====================================================================================================");
-                    Console.WriteLine("                                         대상 파일의 인코딩을 선택하세요.");
-                    Console.WriteLine("====================================================================================================");
-                    Console.WriteLine("[0]. UTF-8");              // 구현
-                    Console.WriteLine("[1]. UTF-8 with BOM");     // 구현, UTF-8과 동일, 나눠야 하는 의미가 없음
-                    Console.WriteLine("[2]. SHIFT-JIS");          // 미구현, 932로 퉁치면 되는데 필요할까?, C#에선 932가 shift-jis로 나와서 뭔지 찾기도 힘들다
-                    Console.WriteLine("[3]. 일본어 확장(cp932)"); // 구현
-                    Console.WriteLine("[4]. EUC-KR");             // 구현, 949로 퉁치면 되는데 필요할까?
-                    Console.WriteLine("[5]. 한국어 확장(cp949)"); // 구현
-                    Console.WriteLine("====================================================================================================");
-                    Console.Write("번호를 입력하세요. 클릭은 지원하지 않습니다. :");
-
-                    string select = Console.ReadLine();
-
-                    switch (select)
-                    {
-                        case "0":
-                            encoding = Encoding.UTF8;
-                            break;
-
-                        case "1":
-                            encoding = Encoding.UTF8;
-                            break;
-
-                        case "3":
-                            encoding = Encoding.GetEncoding(932);
-                            break;
-
-                        case "4":
-                            encoding = Encoding.GetEncoding(51949); // 이거 맞겠지?
-                            break;
-
-                        case "5":
-                            encoding = Encoding.GetEncoding(949);
-                            break;
-
-                        default:
-                            Console.WriteLine("잘못된 입력입니다.");
-                            SelectEncoding();
                             break;
                     }
                 }

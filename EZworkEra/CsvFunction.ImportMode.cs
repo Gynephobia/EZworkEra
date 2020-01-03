@@ -8,7 +8,8 @@
             NoChara,
             Revert,
             OnlyMyName,
-            OnlyMyVariable
+            OnlyMyVariable,
+            VarDict
         };
     }
 }
