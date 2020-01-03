@@ -13,7 +13,7 @@ namespace EZworkEra
             Console.WriteLine("====================================================================================================");
             Console.WriteLine("작업 후 버튼을 눌러 프로그램을 종료하셔야 작업파일이 손실되지 않습니다.");
             Console.WriteLine("====================================================================================================");
-            Console.WriteLine("[0]. CSV 파일 처리");
+            Console.WriteLine("[0]. CSV 파일 처리");          // 구현
             Console.WriteLine("[1]. ERB 파일 처리");
             Console.WriteLine("[2]. ERH 파일 처리 (미구현)"); // 구현
             Console.WriteLine("[3]. 결과물 제어");
